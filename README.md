@@ -41,6 +41,8 @@ cargo tauri build
 
 Platform-specific installers are output to `src-tauri/target/release/bundle/`.
 
+Arch Linux packaging is provided via the [`aur/`](./aur) scaffold, which consumes the released `.deb` artifacts for `x86_64` and `aarch64`.
+
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).

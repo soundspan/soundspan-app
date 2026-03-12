@@ -16,10 +16,24 @@ jobs:
         include:
           - platform: ubuntu-22.04
             target: linux
+            rust_target: x86_64-unknown-linux-gnu
+            tauri_args: --target x86_64-unknown-linux-gnu
+          - platform: ubuntu-22.04-arm
+            target: linux
+            rust_target: aarch64-unknown-linux-gnu
+            tauri_args: --target aarch64-unknown-linux-gnu
           - platform: macos-latest
             target: macos
+            rust_target: ""
+            tauri_args: --target universal-apple-darwin
           - platform: windows-latest
             target: windows
+            rust_target: x86_64-pc-windows-msvc
+            tauri_args: --target x86_64-pc-windows-msvc
+          - platform: windows-11-arm
+            target: windows
+            rust_target: aarch64-pc-windows-msvc
+            tauri_args: --target aarch64-pc-windows-msvc
 
     runs-on: ${{ matrix.platform }}
     env:
@@ -29,6 +43,10 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Add non-default Rust target
+        if: ${{ matrix.rust_target != '' && matrix.target != 'macos' }}
+        run: rustup target add ${{ matrix.rust_target }}
 
       # Linux dependencies
       - name: Install Linux dependencies
@@ -41,6 +59,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libasound2-dev \
+            rpm \
             pkg-config
 
       # macOS: install both targets for universal binary
@@ -85,7 +104,7 @@ jobs:
           releaseBody: "Native desktop app release. See the [changelog](https://github.com/soundspan/soundspan-app/blob/main/CHANGELOG.md) for details."
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.target == 'macos' && '--target universal-apple-darwin' || '' }}
+          args: ${{ matrix.tauri_args }}
 
       - name: Build unsigned macOS bundle
         if: ${{ matrix.target == 'macos' && env.HAS_APPLE_SIGNING != 'true' }}
@@ -98,4 +117,4 @@ jobs:
           releaseBody: "Native desktop app release. See the [changelog](https://github.com/soundspan/soundspan-app/blob/main/CHANGELOG.md) for details."
           releaseDraft: false
           prerelease: false
-          args: --target universal-apple-darwin --no-sign
+          args: ${{ format('{0} --no-sign', matrix.tauri_args) }}
