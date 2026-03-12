@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{SampleFormat, StreamConfig};
+use cpal::{SampleFormat, SampleRate, StreamConfig, SupportedStreamConfig};
 use ringbuf::traits::{Consumer, Observer, Producer, Split};
 use ringbuf::HeapRb;
 
@@ -29,10 +29,10 @@ pub enum OutputError {
 impl fmt::Display for OutputError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            OutputError::NoDevice(msg) => write!(f, "No audio device: {}", msg),
-            OutputError::DeviceError(msg) => write!(f, "Device error: {}", msg),
-            OutputError::StreamError(msg) => write!(f, "Stream error: {}", msg),
-            OutputError::ExclusiveDenied(msg) => write!(f, "Exclusive mode denied: {}", msg),
+            OutputError::NoDevice(msg) => write!(f, "No audio device: {msg}"),
+            OutputError::DeviceError(msg) => write!(f, "Device error: {msg}"),
+            OutputError::StreamError(msg) => write!(f, "Stream error: {msg}"),
+            OutputError::ExclusiveDenied(msg) => write!(f, "Exclusive mode denied: {msg}"),
         }
     }
 }
@@ -43,17 +43,24 @@ impl std::error::Error for OutputError {}
 struct SharedState {
     volume: AtomicU32,
     paused: AtomicBool,
-    samples_written: AtomicU64,
+    frames_played: AtomicU64,
+    buffering: AtomicBool,
 }
 
 /// Audio output stream manager.
 ///
-/// Owns the cpal stream and provides transport controls (pause, resume, volume).
-/// Position tracking is derived from the sample counter in the audio callback.
+/// Owns the cpal stream while `AudioOutputController` exposes transport
+/// controls and playback telemetry for other threads.
 pub struct AudioOutput {
     _stream: cpal::Stream,
+}
+
+/// Thread-safe transport controls for an active output stream.
+#[derive(Clone)]
+pub struct AudioOutputController {
     sample_rate: u32,
-    channels: u16,
+    source_channels: u16,
+    device_channels: u16,
     shared: Arc<SharedState>,
     exclusive: bool,
 }
@@ -66,140 +73,196 @@ pub struct RingBufferWriter {
 impl AudioOutput {
     /// Open an audio output stream.
     ///
-    /// Creates a ring buffer and returns both the output handle and a writer for
-    /// the decode thread. The cpal callback reads samples from the ring buffer.
-    ///
-    /// # Arguments
-    /// * `sample_rate` — desired output sample rate (source file's native rate)
-    /// * `channels` — number of audio channels (typically 2)
-    /// * `exclusive` — if true, attempt WASAPI exclusive mode (Windows only)
+    /// Creates a ring buffer and returns the output handle, a controller for
+    /// cross-thread transport commands, and a writer for the decode thread.
     pub fn open(
         sample_rate: u32,
         channels: u16,
-        _exclusive: bool,
-    ) -> Result<(Self, RingBufferWriter), OutputError> {
+        exclusive: bool,
+    ) -> Result<(Self, AudioOutputController, RingBufferWriter), OutputError> {
         let host = cpal::default_host();
         let device = host
             .default_output_device()
             .ok_or_else(|| OutputError::NoDevice("No default output device".to_string()))?;
 
-        // Ring buffer: 2 seconds of audio
+        let config = {
+            #[cfg(target_os = "windows")]
+            {
+                if exclusive {
+                    Self::select_output_config(
+                        &device,
+                        sample_rate,
+                        channels,
+                        OutputError::ExclusiveDenied,
+                    )?
+                } else {
+                    Self::select_output_config(
+                        &device,
+                        sample_rate,
+                        channels,
+                        OutputError::DeviceError,
+                    )?
+                }
+            }
+
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = exclusive;
+                Self::select_output_config(
+                    &device,
+                    sample_rate,
+                    channels,
+                    OutputError::DeviceError,
+                )?
+            }
+        };
+
+        let device_channels = config.channels();
+
+        // Ring buffer: 2 seconds of source audio.
         let buffer_capacity = (sample_rate as usize) * (channels as usize) * 2;
-        let rb = HeapRb::<f32>::new(buffer_capacity);
+        let rb = HeapRb::<f32>::new(buffer_capacity.max(1));
         let (producer, consumer) = rb.split();
 
         let shared = Arc::new(SharedState {
             volume: AtomicU32::new(1.0f32.to_bits()),
             paused: AtomicBool::new(false),
-            samples_written: AtomicU64::new(0),
+            frames_played: AtomicU64::new(0),
+            buffering: AtomicBool::new(false),
         });
 
-        // Try exclusive mode on Windows if requested
-        #[cfg(target_os = "windows")]
-        let (stream, actual_exclusive) = if exclusive {
-            match Self::try_exclusive_stream(&device, sample_rate, channels, consumer, shared.clone()) {
-                Ok(stream) => (stream, true),
-                Err(e) => {
-                    log::warn!("Exclusive mode denied, falling back to shared: {}", e);
-                    let stream = Self::build_shared_stream(&device, sample_rate, channels, consumer, shared.clone())?;
-                    (stream, false)
-                }
-            }
-        } else {
-            let stream = Self::build_shared_stream(&device, sample_rate, channels, consumer, shared.clone())?;
-            (stream, false)
-        };
-
-        #[cfg(not(target_os = "windows"))]
-        let (stream, actual_exclusive) = {
-            let stream = Self::build_shared_stream(&device, sample_rate, channels, consumer, shared.clone())?;
-            (stream, false)
-        };
+        let stream_config: StreamConfig = config.clone().into();
+        let stream = match config.sample_format() {
+            SampleFormat::F32 => Self::build_stream_f32(
+                &device,
+                &stream_config,
+                consumer,
+                shared.clone(),
+                channels as usize,
+                device_channels as usize,
+            ),
+            SampleFormat::I16 => Self::build_stream_i16(
+                &device,
+                &stream_config,
+                consumer,
+                shared.clone(),
+                channels as usize,
+                device_channels as usize,
+            ),
+            fmt => Err(OutputError::StreamError(format!(
+                "Unsupported sample format: {fmt:?}"
+            ))),
+        }?;
 
         stream
             .play()
             .map_err(|e| OutputError::StreamError(e.to_string()))?;
 
+        let controller = AudioOutputController {
+            sample_rate,
+            source_channels: channels,
+            device_channels,
+            shared,
+            exclusive: cfg!(target_os = "windows") && exclusive,
+        };
+
         Ok((
-            AudioOutput {
-                _stream: stream,
-                sample_rate,
-                channels,
-                shared,
-                exclusive: actual_exclusive,
-            },
+            AudioOutput { _stream: stream },
+            controller,
             RingBufferWriter { producer },
         ))
     }
 
-    /// Build a shared-mode output stream.
-    fn build_shared_stream(
+    fn select_output_config<F>(
         device: &cpal::Device,
-        _sample_rate: u32,
-        _channels: u16,
-        consumer: ringbuf::HeapCons<f32>,
-        shared: Arc<SharedState>,
-    ) -> Result<cpal::Stream, OutputError> {
-        let default_config = device
-            .default_output_config()
-            .map_err(|e| OutputError::DeviceError(e.to_string()))?;
+        sample_rate: u32,
+        channels: u16,
+        make_error: F,
+    ) -> Result<SupportedStreamConfig, OutputError>
+    where
+        F: Fn(String) -> OutputError,
+    {
+        let target_rate = SampleRate(sample_rate);
+        let supported_configs = device
+            .supported_output_configs()
+            .map_err(|e| make_error(e.to_string()))?;
 
-        let config: StreamConfig = default_config.clone().into();
-        let device_channels = config.channels as usize;
+        let mut best_config = None;
+        let mut best_score = (u16::MAX, u8::MAX);
 
-        match default_config.sample_format() {
-            SampleFormat::F32 => Self::build_stream_f32(device, &config, consumer, shared, device_channels),
-            SampleFormat::I16 => Self::build_stream_i16(device, &config, consumer, shared, device_channels),
-            fmt => Err(OutputError::StreamError(format!(
-                "Unsupported sample format: {:?}",
-                fmt
-            ))),
+        for config in supported_configs {
+            if config.min_sample_rate() > target_rate || config.max_sample_rate() < target_rate {
+                continue;
+            }
+
+            let candidate = config.with_sample_rate(target_rate);
+            let format_rank = match candidate.sample_format() {
+                SampleFormat::F32 => 0,
+                SampleFormat::I16 => 1,
+                _ => continue,
+            };
+            let channel_rank = candidate.channels().abs_diff(channels);
+            let score = (channel_rank, format_rank);
+
+            if score < best_score {
+                best_score = score;
+                best_config = Some(candidate);
+                if score == (0, 0) {
+                    break;
+                }
+            }
         }
+
+        best_config.ok_or_else(|| {
+            make_error(format!(
+                "No supported output config for {sample_rate}Hz on the default device"
+            ))
+        })
     }
 
-    /// Build an f32 output stream.
     fn build_stream_f32(
         device: &cpal::Device,
         config: &StreamConfig,
         mut consumer: ringbuf::HeapCons<f32>,
         shared: Arc<SharedState>,
+        source_channels: usize,
         device_channels: usize,
     ) -> Result<cpal::Stream, OutputError> {
+        let mut source_frame = vec![0.0f32; source_channels];
         let stream = device
             .build_output_stream(
                 config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    let paused = shared.paused.load(Ordering::Relaxed);
-                    let volume = f32::from_bits(shared.volume.load(Ordering::Relaxed));
-
-                    if paused {
+                    if shared.paused.load(Ordering::Relaxed) {
+                        shared.buffering.store(false, Ordering::Relaxed);
                         data.fill(0.0);
                         return;
                     }
 
-                    let mut written = 0usize;
+                    let volume = f32::from_bits(shared.volume.load(Ordering::Relaxed));
+                    let mut callback_buffering = false;
+                    let mut frames_played = 0u64;
+
                     for frame in data.chunks_mut(device_channels) {
-                        // Read one frame (source channels) from ring buffer
-                        let mut got_sample = false;
-                        for sample_out in frame.iter_mut() {
-                            if let Some(sample) = consumer.try_pop() {
-                                *sample_out = sample * volume;
-                                got_sample = true;
-                            } else {
-                                *sample_out = 0.0;
-                            }
+                        let complete_frame =
+                            populate_source_frame(&mut consumer, &mut source_frame);
+                        if !complete_frame {
+                            callback_buffering = true;
+                        } else {
+                            frames_played += 1;
                         }
-                        if got_sample {
-                            written += device_channels;
-                        }
+                        mix_source_frame_to_f32(&source_frame, frame, volume);
                     }
 
                     shared
-                        .samples_written
-                        .fetch_add(written as u64, Ordering::Relaxed);
+                        .frames_played
+                        .fetch_add(frames_played, Ordering::Relaxed);
+                    shared
+                        .buffering
+                        .store(callback_buffering, Ordering::Relaxed);
                 },
                 |err| {
-                    log::error!("Audio stream error: {}", err);
+                    log::error!("Audio stream error: {err}");
                 },
                 None,
             )
@@ -208,48 +271,49 @@ impl AudioOutput {
         Ok(stream)
     }
 
-    /// Build an i16 output stream (for devices that don't support f32).
     fn build_stream_i16(
         device: &cpal::Device,
         config: &StreamConfig,
         mut consumer: ringbuf::HeapCons<f32>,
         shared: Arc<SharedState>,
+        source_channels: usize,
         device_channels: usize,
     ) -> Result<cpal::Stream, OutputError> {
+        let mut source_frame = vec![0.0f32; source_channels];
         let stream = device
             .build_output_stream(
                 config,
                 move |data: &mut [i16], _: &cpal::OutputCallbackInfo| {
-                    let paused = shared.paused.load(Ordering::Relaxed);
-                    let volume = f32::from_bits(shared.volume.load(Ordering::Relaxed));
-
-                    if paused {
+                    if shared.paused.load(Ordering::Relaxed) {
+                        shared.buffering.store(false, Ordering::Relaxed);
                         data.fill(0);
                         return;
                     }
 
-                    let mut written = 0usize;
+                    let volume = f32::from_bits(shared.volume.load(Ordering::Relaxed));
+                    let mut callback_buffering = false;
+                    let mut frames_played = 0u64;
+
                     for frame in data.chunks_mut(device_channels) {
-                        let mut got_sample = false;
-                        for sample_out in frame.iter_mut() {
-                            if let Some(sample) = consumer.try_pop() {
-                                *sample_out = f32_to_i16(sample * volume);
-                                got_sample = true;
-                            } else {
-                                *sample_out = 0;
-                            }
+                        let complete_frame =
+                            populate_source_frame(&mut consumer, &mut source_frame);
+                        if !complete_frame {
+                            callback_buffering = true;
+                        } else {
+                            frames_played += 1;
                         }
-                        if got_sample {
-                            written += device_channels;
-                        }
+                        mix_source_frame_to_i16(&source_frame, frame, volume);
                     }
 
                     shared
-                        .samples_written
-                        .fetch_add(written as u64, Ordering::Relaxed);
+                        .frames_played
+                        .fetch_add(frames_played, Ordering::Relaxed);
+                    shared
+                        .buffering
+                        .store(callback_buffering, Ordering::Relaxed);
                 },
                 |err| {
-                    log::error!("Audio stream error: {}", err);
+                    log::error!("Audio stream error: {err}");
                 },
                 None,
             )
@@ -257,67 +321,9 @@ impl AudioOutput {
 
         Ok(stream)
     }
+}
 
-    /// Attempt to open a WASAPI exclusive mode stream (Windows only).
-    #[cfg(target_os = "windows")]
-    fn try_exclusive_stream(
-        device: &cpal::Device,
-        sample_rate: u32,
-        channels: u16,
-        consumer: ringbuf::HeapCons<f32>,
-        shared: Arc<SharedState>,
-    ) -> Result<cpal::Stream, OutputError> {
-        let supported_configs = device
-            .supported_output_configs()
-            .map_err(|e| OutputError::ExclusiveDenied(e.to_string()))?;
-
-        // Find a config matching our exact sample rate, preferring f32
-        let target_rate = SampleRate(sample_rate);
-        let mut best_config = None;
-
-        for cfg in supported_configs {
-            if cfg.min_sample_rate() <= target_rate && cfg.max_sample_rate() >= target_rate {
-                let with_rate = cfg.with_sample_rate(target_rate);
-                match with_rate.sample_format() {
-                    SampleFormat::F32 => {
-                        best_config = Some(with_rate);
-                        break; // f32 is preferred
-                    }
-                    SampleFormat::I16 => {
-                        if best_config.is_none() {
-                            best_config = Some(with_rate);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        let config = best_config
-            .ok_or_else(|| {
-                OutputError::ExclusiveDenied(format!(
-                    "No supported config for {}Hz exclusive",
-                    sample_rate
-                ))
-            })?;
-
-        let device_channels = config.channels() as usize;
-        let stream_config: StreamConfig = config.clone().into();
-
-        match config.sample_format() {
-            SampleFormat::F32 => {
-                Self::build_stream_f32(device, &stream_config, consumer, shared, device_channels)
-            }
-            SampleFormat::I16 => {
-                Self::build_stream_i16(device, &stream_config, consumer, shared, device_channels)
-            }
-            fmt => Err(OutputError::ExclusiveDenied(format!(
-                "Unsupported exclusive format: {:?}",
-                fmt
-            ))),
-        }
-    }
-
+impl AudioOutputController {
     /// Pause audio output. The callback will write silence.
     pub fn pause(&self) {
         self.shared.paused.store(true, Ordering::Relaxed);
@@ -337,21 +343,26 @@ impl AudioOutput {
     }
 
     /// Get the current playback position in seconds.
-    ///
-    /// Derived from the total number of samples written to the audio device.
     pub fn position_secs(&self) -> f64 {
-        let samples = self.shared.samples_written.load(Ordering::Relaxed);
-        samples as f64 / (self.sample_rate as f64 * self.channels as f64)
+        let frames = self.shared.frames_played.load(Ordering::Relaxed);
+        frames as f64 / self.sample_rate as f64
     }
 
     /// Reset the position counter (e.g., after a seek).
     pub fn reset_position(&self) {
-        self.shared.samples_written.store(0, Ordering::Relaxed);
+        self.shared.frames_played.store(0, Ordering::Relaxed);
     }
 
-    /// Get the output sample rate.
-    pub fn sample_rate(&self) -> u32 {
-        self.sample_rate
+    pub fn is_buffering(&self) -> bool {
+        self.shared.buffering.load(Ordering::Relaxed)
+    }
+
+    pub fn source_channels(&self) -> u16 {
+        self.source_channels
+    }
+
+    pub fn device_channels(&self) -> u16 {
+        self.device_channels
     }
 
     /// Whether exclusive mode is active.
@@ -362,28 +373,99 @@ impl AudioOutput {
 
 impl RingBufferWriter {
     /// Push samples into the ring buffer (non-blocking).
-    ///
-    /// Returns the number of samples actually written. May be less than
-    /// `samples.len()` if the buffer is full.
     pub fn write(&mut self, samples: &[f32]) -> usize {
         self.producer.push_slice(samples)
     }
 
     /// Push all samples, yielding the thread when the buffer is full.
-    pub fn write_blocking(&mut self, samples: &[f32]) {
+    ///
+    /// Returns `false` if the write was interrupted by a stop signal.
+    pub fn write_interruptible(&mut self, samples: &[f32], stop: &AtomicBool) -> bool {
         let mut offset = 0;
         while offset < samples.len() {
+            if stop.load(Ordering::Relaxed) {
+                return false;
+            }
+
             let written = self.producer.push_slice(&samples[offset..]);
             offset += written;
+
             if offset < samples.len() {
-                std::thread::yield_now();
+                std::thread::sleep(std::time::Duration::from_millis(2));
             }
         }
+
+        true
     }
 
     /// How many samples can be written without blocking.
     pub fn available(&self) -> usize {
         self.producer.vacant_len()
+    }
+}
+
+fn populate_source_frame(consumer: &mut ringbuf::HeapCons<f32>, frame: &mut [f32]) -> bool {
+    let mut complete_frame = true;
+    for sample in frame.iter_mut() {
+        if let Some(value) = consumer.try_pop() {
+            *sample = value;
+        } else {
+            *sample = 0.0;
+            complete_frame = false;
+        }
+    }
+    complete_frame
+}
+
+fn mix_source_frame_to_f32(source: &[f32], dest: &mut [f32], volume: f32) {
+    if dest.is_empty() {
+        return;
+    }
+
+    if source.len() == 1 {
+        let sample = source[0] * volume;
+        dest.fill(sample);
+        return;
+    }
+
+    if dest.len() == 1 {
+        let sample = source.iter().copied().sum::<f32>() / source.len() as f32;
+        dest[0] = sample * volume;
+        return;
+    }
+
+    for (idx, sample_out) in dest.iter_mut().enumerate() {
+        let sample = source
+            .get(idx)
+            .copied()
+            .unwrap_or_else(|| *source.last().unwrap_or(&0.0));
+        *sample_out = sample * volume;
+    }
+}
+
+fn mix_source_frame_to_i16(source: &[f32], dest: &mut [i16], volume: f32) {
+    if dest.is_empty() {
+        return;
+    }
+
+    if source.len() == 1 {
+        let sample = f32_to_i16(source[0] * volume);
+        dest.fill(sample);
+        return;
+    }
+
+    if dest.len() == 1 {
+        let sample = source.iter().copied().sum::<f32>() / source.len() as f32;
+        dest[0] = f32_to_i16(sample * volume);
+        return;
+    }
+
+    for (idx, sample_out) in dest.iter_mut().enumerate() {
+        let sample = source
+            .get(idx)
+            .copied()
+            .unwrap_or_else(|| *source.last().unwrap_or(&0.0));
+        *sample_out = f32_to_i16(sample * volume);
     }
 }
 
@@ -393,4 +475,30 @@ fn f32_to_i16(sample: f32) -> i16 {
     let scaled = sample * 32767.0;
     let clamped = scaled.clamp(-32768.0, 32767.0);
     clamped as i16
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{mix_source_frame_to_f32, mix_source_frame_to_i16};
+
+    #[test]
+    fn duplicates_mono_into_stereo() {
+        let mut dest = [0.0f32; 2];
+        mix_source_frame_to_f32(&[0.25], &mut dest, 1.0);
+        assert_eq!(dest, [0.25, 0.25]);
+    }
+
+    #[test]
+    fn averages_stereo_into_mono() {
+        let mut dest = [0.0f32; 1];
+        mix_source_frame_to_f32(&[0.25, 0.75], &mut dest, 1.0);
+        assert_eq!(dest, [0.5]);
+    }
+
+    #[test]
+    fn converts_to_i16_after_mixing() {
+        let mut dest = [0i16; 2];
+        mix_source_frame_to_i16(&[0.5], &mut dest, 1.0);
+        assert_eq!(dest, [16383, 16383]);
+    }
 }

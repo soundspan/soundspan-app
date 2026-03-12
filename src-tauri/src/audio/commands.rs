@@ -3,8 +3,11 @@
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::State;
+use tauri_plugin_store::StoreExt;
+
+use crate::config::security::ensure_instance_caller;
 
 use super::player::AudioPlayer;
 use super::state::PlaybackSnapshot;
@@ -18,127 +21,120 @@ pub struct CommandResult {
 
 impl CommandResult {
     pub fn ok() -> Self {
-        Self { ok: true, error: None }
-    }
-
-    #[allow(dead_code)]
-    pub fn err(msg: impl Into<String>) -> Self {
         Self {
-            ok: false,
-            error: Some(msg.into()),
+            ok: true,
+            error: None,
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PlayArgs {
-    pub url: String,
-    pub format: Option<String>,
-    pub headers: Option<HashMap<String, String>>,
-    pub autoplay: Option<bool>,
 }
 
 #[tauri::command]
 pub async fn native_audio_play(
     app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     player: State<'_, AudioPlayer>,
-    args: PlayArgs,
+    url: String,
+    format: Option<String>,
+    headers: Option<HashMap<String, String>>,
+    autoplay: Option<bool>,
 ) -> Result<CommandResult, String> {
-    player.play(
-        &app,
-        args.url,
-        args.format,
-        args.headers,
-        args.autoplay.unwrap_or(true),
-    )?;
+    ensure_instance_caller(&app, &window)?;
+    player.play(&app, url, format, headers, autoplay.unwrap_or(true))?;
     Ok(CommandResult::ok())
 }
 
 #[tauri::command]
 pub async fn native_audio_pause(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     player: State<'_, AudioPlayer>,
 ) -> Result<CommandResult, String> {
-    player.pause();
+    ensure_instance_caller(&app, &window)?;
+    player.pause(&app);
     Ok(CommandResult::ok())
 }
 
 #[tauri::command]
 pub async fn native_audio_resume(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     player: State<'_, AudioPlayer>,
 ) -> Result<CommandResult, String> {
-    player.resume();
+    ensure_instance_caller(&app, &window)?;
+    player.resume(&app);
     Ok(CommandResult::ok())
 }
 
 #[tauri::command]
 pub async fn native_audio_stop(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     player: State<'_, AudioPlayer>,
 ) -> Result<CommandResult, String> {
-    player.stop();
+    ensure_instance_caller(&app, &window)?;
+    player.stop(&app);
     Ok(CommandResult::ok())
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SeekArgs {
-    pub position_secs: f64,
 }
 
 #[tauri::command]
 pub async fn native_audio_seek(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     player: State<'_, AudioPlayer>,
-    args: SeekArgs,
+    position_secs: f64,
 ) -> Result<CommandResult, String> {
-    player.seek(args.position_secs)?;
+    ensure_instance_caller(&app, &window)?;
+    player.seek(&app, position_secs)?;
     Ok(CommandResult::ok())
-}
-
-#[derive(Debug, Deserialize)]
-pub struct VolumeArgs {
-    pub level: f32,
 }
 
 #[tauri::command]
 pub async fn native_audio_set_volume(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     player: State<'_, AudioPlayer>,
-    args: VolumeArgs,
+    level: f32,
 ) -> Result<CommandResult, String> {
-    player.set_volume(args.level);
+    ensure_instance_caller(&app, &window)?;
+    player.set_volume(&app, level);
     Ok(CommandResult::ok())
 }
 
 #[tauri::command]
 pub async fn native_audio_get_state(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     player: State<'_, AudioPlayer>,
 ) -> Result<PlaybackSnapshot, String> {
+    ensure_instance_caller(&app, &window)?;
     Ok(player.get_state())
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PreloadArgs {
-    pub url: String,
-    pub format: Option<String>,
-    pub headers: Option<HashMap<String, String>>,
 }
 
 #[tauri::command]
 pub async fn native_audio_preload(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     player: State<'_, AudioPlayer>,
-    args: PreloadArgs,
+    url: String,
+    format: Option<String>,
+    headers: Option<HashMap<String, String>>,
 ) -> Result<CommandResult, String> {
-    player.preload(args.url, args.headers)?;
+    ensure_instance_caller(&app, &window)?;
+    player.preload(url, format, headers)?;
     Ok(CommandResult::ok())
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ExclusiveArgs {
-    pub enabled: bool,
 }
 
 #[tauri::command]
 pub async fn native_audio_set_exclusive(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     player: State<'_, AudioPlayer>,
-    args: ExclusiveArgs,
+    enabled: bool,
 ) -> Result<CommandResult, String> {
-    player.set_exclusive(args.enabled);
+    ensure_instance_caller(&app, &window)?;
+    let store = app.store("config.json").map_err(|e| e.to_string())?;
+    store.set("wasapi_exclusive_enabled", serde_json::json!(enabled));
+    store.save().map_err(|e| e.to_string())?;
+    player.set_exclusive(&app, enabled)?;
     Ok(CommandResult::ok())
 }

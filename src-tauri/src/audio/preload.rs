@@ -36,9 +36,10 @@ impl PreloadManager {
     pub fn preload(
         &self,
         url: &str,
+        format: Option<&str>,
         headers: HashMap<String, String>,
     ) -> Result<(), DecoderError> {
-        let mut decoder = AudioDecoder::from_url(url, headers)?;
+        let mut decoder = AudioDecoder::from_url(url, headers, format)?;
         let track_info = decoder.track_info().clone();
 
         let mut all_samples = Vec::new();

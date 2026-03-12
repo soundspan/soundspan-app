@@ -93,6 +93,13 @@ impl PlaybackState {
         self.inner.lock().unwrap().meta = meta;
     }
 
+    pub fn clear_track(&self) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.position_secs = 0.0;
+        inner.meta = AudioMeta::default();
+        inner.current_url = None;
+    }
+
     pub fn exclusive_mode(&self) -> bool {
         self.inner.lock().unwrap().exclusive_mode
     }
@@ -129,6 +136,7 @@ impl PlaybackState {
             channels: inner.meta.channels,
             format: inner.meta.format.clone(),
             exclusive_mode: inner.exclusive_mode,
+            volume: inner.volume,
         }
     }
 }
@@ -144,4 +152,5 @@ pub struct PlaybackSnapshot {
     pub channels: u16,
     pub format: String,
     pub exclusive_mode: bool,
+    pub volume: f32,
 }

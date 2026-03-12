@@ -6,6 +6,8 @@ mod config;
 use tauri::Manager;
 use tauri_plugin_store::StoreExt;
 
+use crate::config::security::ensure_local_caller;
+
 // ---------------------------------------------------------------------------
 // Instance URL commands
 // ---------------------------------------------------------------------------
@@ -20,12 +22,33 @@ struct UrlResult {
 #[tauri::command]
 async fn set_instance_url(
     app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     url: String,
 ) -> Result<UrlResult, String> {
+    ensure_local_caller(&window)?;
     let trimmed = url.trim().trim_end_matches('/').to_string();
 
-    if url::Url::parse(&trimmed).is_err() {
-        return Ok(UrlResult { ok: false, error: Some("Invalid URL format".into()) });
+    let parsed = match url::Url::parse(&trimmed) {
+        Ok(parsed) if matches!(parsed.scheme(), "http" | "https") => parsed,
+        Ok(_) => {
+            return Ok(UrlResult {
+                ok: false,
+                error: Some("Instance URL must use http or https".into()),
+            });
+        }
+        Err(_) => {
+            return Ok(UrlResult {
+                ok: false,
+                error: Some("Invalid URL format".into()),
+            });
+        }
+    };
+
+    if parsed.host_str().is_none() {
+        return Ok(UrlResult {
+            ok: false,
+            error: Some("Invalid URL format".into()),
+        });
     }
 
     let health_url = format!("{}/api/health", trimmed);
@@ -56,15 +79,21 @@ async fn set_instance_url(
     store.save().map_err(|e| e.to_string())?;
 
     if let Some(window) = app.get_webview_window("main") {
-        let parsed: url::Url = trimmed.parse().map_err(|e: url::ParseError| e.to_string())?;
         let _ = window.navigate(parsed);
     }
 
-    Ok(UrlResult { ok: true, error: None })
+    Ok(UrlResult {
+        ok: true,
+        error: None,
+    })
 }
 
 #[tauri::command]
-async fn get_instance_url(app: tauri::AppHandle) -> Result<Option<String>, String> {
+async fn get_instance_url(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
+    ensure_local_caller(&window)?;
     let store = app.store("config.json").map_err(|e| e.to_string())?;
     let url = store
         .get("instance_url")
@@ -101,6 +130,13 @@ fn main() {
                     Ok(s) => s,
                     Err(_) => return,
                 };
+                if let Some(enabled) = store
+                    .get("wasapi_exclusive_enabled")
+                    .and_then(|v| v.as_bool())
+                {
+                    let player = handle.state::<audio::player::AudioPlayer>();
+                    player.restore_exclusive(enabled);
+                }
                 if let Some(url_str) = store
                     .get("instance_url")
                     .and_then(|v| v.as_str().map(String::from))

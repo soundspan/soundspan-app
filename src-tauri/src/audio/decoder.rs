@@ -110,7 +110,11 @@ impl AudioDecoder {
     /// Create a decoder from an HTTP URL.
     ///
     /// Fetches the URL with the provided headers and probes the stream format.
-    pub fn from_url(url: &str, headers: HashMap<String, String>) -> Result<Self, DecoderError> {
+    pub fn from_url(
+        url: &str,
+        headers: HashMap<String, String>,
+        hint: Option<&str>,
+    ) -> Result<Self, DecoderError> {
         let mut req = reqwest::blocking::Client::new().get(url);
         for (key, value) in &headers {
             req = req.header(key.as_str(), value.as_str());
@@ -138,13 +142,13 @@ impl AudioDecoder {
         };
 
         // Extract format hint from URL extension
-        let hint = url
+        let inferred_hint = url
             .split('?')
             .next()
             .and_then(|path| path.rsplit('.').next())
             .map(|ext| ext.to_lowercase());
 
-        Self::from_reader(Box::new(source), hint.as_deref())
+        Self::from_reader(Box::new(source), hint.or(inferred_hint.as_deref()))
     }
 
     /// Create a decoder from an existing `MediaSource`.
@@ -166,7 +170,12 @@ impl AudioDecoder {
         let metadata_opts = MetadataOptions::default();
 
         let probed = symphonia::default::get_probe()
-            .format(&probe_hint, symphonia::core::io::MediaSourceStream::new(reader, Default::default()), &format_opts, &metadata_opts)
+            .format(
+                &probe_hint,
+                symphonia::core::io::MediaSourceStream::new(reader, Default::default()),
+                &format_opts,
+                &metadata_opts,
+            )
             .map_err(|e| DecoderError::UnsupportedFormat(e.to_string()))?;
 
         let format_reader = probed.format;

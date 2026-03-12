@@ -10,7 +10,6 @@
     "core:event:default",
     "core:event:allow-listen",
     "core:event:allow-emit",
-    "store:default",
     "os:default"
   ]
 }
