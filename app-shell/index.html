@@ -111,7 +111,11 @@
             err.style.display = "none";
 
             try {
-                const { invoke } = window.__TAURI__.core;
+                const tauri = window.__TAURI__;
+                if (!tauri || !tauri.core || typeof tauri.core.invoke !== "function") {
+                    throw new Error("Tauri API is unavailable. Restart the app after updating it.");
+                }
+                const { invoke } = tauri.core;
                 const result = await invoke("set_instance_url", { url });
                 if (!result.ok) {
                     throw new Error(result.error || "Connection failed");

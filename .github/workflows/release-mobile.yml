@@ -41,6 +41,17 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2"
 
+      - name: Prepare release version overrides
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n 1)"
+          fi
+          for platform in linux windows macos android ios; do
+            printf '{\n  "version": "%s"\n}\n' "$VERSION" > "src-tauri/tauri.${platform}.conf.json"
+          done
+
       - name: Initialize Android project
         run: cargo tauri android init
 
@@ -74,6 +85,17 @@ jobs:
 
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2"
+
+      - name: Prepare release version overrides
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n 1)"
+          fi
+          for platform in linux windows macos android ios; do
+            printf '{\n  "version": "%s"\n}\n' "$VERSION" > "src-tauri/tauri.${platform}.conf.json"
+          done
 
       - name: Initialize iOS project
         run: cargo tauri ios init
