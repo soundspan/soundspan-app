@@ -3,6 +3,7 @@
 //! Holds one pre-decoded track in memory. When the next track matches the
 //! preloaded URL, playback starts instantly from the buffer instead of
 //! fetching and decoding from scratch.
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

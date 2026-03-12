@@ -2,6 +2,7 @@
 //!
 //! Decodes audio files fetched via HTTP into interleaved f32 PCM samples.
 //! Supports FLAC, WAV, MP3, AAC, Vorbis, Opus via symphonia codecs.
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::io::{self, Read, Seek, SeekFrom};

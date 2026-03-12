@@ -1,4 +1,5 @@
 //! Tauri IPC command handlers for the native audio backend.
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 

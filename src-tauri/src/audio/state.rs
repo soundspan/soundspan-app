@@ -1,4 +1,5 @@
 //! Shared playback state for the native audio backend.
+#![allow(dead_code)]
 
 use serde::Serialize;
 use std::sync::{Arc, Mutex};

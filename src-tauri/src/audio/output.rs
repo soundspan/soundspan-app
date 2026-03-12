@@ -6,6 +6,7 @@
 //! - Linux/macOS: ALSA/CoreAudio (not normally used since WebKit handles audio)
 //!
 //! Uses a lock-free SPSC ring buffer for zero-allocation audio callback.
+#![allow(dead_code)]
 
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -180,12 +181,12 @@ impl AudioOutput {
                     for frame in data.chunks_mut(device_channels) {
                         // Read one frame (source channels) from ring buffer
                         let mut got_sample = false;
-                        for ch in 0..device_channels {
+                        for sample_out in frame.iter_mut() {
                             if let Some(sample) = consumer.try_pop() {
-                                frame[ch] = sample * volume;
+                                *sample_out = sample * volume;
                                 got_sample = true;
                             } else {
-                                frame[ch] = 0.0;
+                                *sample_out = 0.0;
                             }
                         }
                         if got_sample {
@@ -230,12 +231,12 @@ impl AudioOutput {
                     let mut written = 0usize;
                     for frame in data.chunks_mut(device_channels) {
                         let mut got_sample = false;
-                        for ch in 0..device_channels {
+                        for sample_out in frame.iter_mut() {
                             if let Some(sample) = consumer.try_pop() {
-                                frame[ch] = f32_to_i16(sample * volume);
+                                *sample_out = f32_to_i16(sample * volume);
                                 got_sample = true;
                             } else {
-                                frame[ch] = 0;
+                                *sample_out = 0;
                             }
                         }
                         if got_sample {
