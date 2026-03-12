@@ -1,0 +1,16 @@
+{
+  "identifier": "main-capability",
+  "description": "Main window capabilities with remote domain IPC access",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://*", "http://*"]
+  },
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "store:default",
+    "os:default"
+  ]
+}

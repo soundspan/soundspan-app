@@ -1,0 +1,33 @@
+# Rust
+/target/
+src-tauri/target/
+
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+*.AppImage
+*.deb
+*.dmg
+*.exe
+*.msi
+*.apk
+*.ipa
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Tauri generated
+src-tauri/gen/
