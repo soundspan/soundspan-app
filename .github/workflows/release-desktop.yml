@@ -22,6 +22,8 @@ jobs:
             target: windows
 
     runs-on: ${{ matrix.platform }}
+    env:
+      HAS_APPLE_SIGNING: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_SIGNING_IDENTITY != '' && secrets.APPLE_ID != '' && secrets.APPLE_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +56,7 @@ jobs:
           workspaces: src-tauri -> target
 
       - name: Build signed desktop bundle
-        if: matrix.target != 'macos' || (secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_SIGNING_IDENTITY != '' && secrets.APPLE_ID != '' && secrets.APPLE_PASSWORD != '' && secrets.APPLE_TEAM_ID != '')
+        if: ${{ matrix.target != 'macos' || env.HAS_APPLE_SIGNING == 'true' }}
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,7 +77,7 @@ jobs:
           args: ${{ matrix.target == 'macos' && '--target universal-apple-darwin' || '' }}
 
       - name: Build unsigned macOS bundle
-        if: matrix.target == 'macos' && !(secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_SIGNING_IDENTITY != '' && secrets.APPLE_ID != '' && secrets.APPLE_PASSWORD != '' && secrets.APPLE_TEAM_ID != '')
+        if: ${{ matrix.target == 'macos' && env.HAS_APPLE_SIGNING != 'true' }}
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
