@@ -1,0 +1,17 @@
+# Maintainer: Josh W<info@soundspan.io>
+pkgname=soundspan-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Native desktop client for soundspan"
+arch=('x86_64')
+url="https://github.com/soundspan/soundspan-app"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'alsa-lib')
+provides=('soundspan')
+conflicts=('soundspan')
+source=("${pkgname}-${pkgver}.pkg.tar.zst::${url}/releases/download/v${pkgver}/soundspan_${pkgver}-1_x86_64.pkg.tar.zst")
+sha256sums=('SKIP')
+
+package() {
+    cp -a "${srcdir}/"* "${pkgdir}/"
+}
