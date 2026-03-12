@@ -1,0 +1,18 @@
+version: acm.tags.v1
+canonical_tags:
+  android: []
+  app: []
+  appicon: []
+  audio: []
+  designs: []
+  foreground: []
+  github: []
+  hdpi: []
+  icons: []
+  ios: []
+  launcher: []
+  mdpi: []
+  mipmap: []
+  round: []
+  shell: []
+  tauri: []

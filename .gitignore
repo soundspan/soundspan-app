@@ -31,3 +31,6 @@ Thumbs.db
 
 # Tauri generated
 src-tauri/gen/
+.acm/context.db
+.acm/context.db-shm
+.acm/context.db-wal
