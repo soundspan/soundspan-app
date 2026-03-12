@@ -1,9 +1,9 @@
 {
   "productName": "soundspan",
   "version": "0.1.0",
-  "identifier": "com.soundspan.app",
+  "identifier": "com.soundspan.desktop",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "../app-shell",
     "devUrl": "http://localhost:3030",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""

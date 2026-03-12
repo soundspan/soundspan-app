@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>soundspan - Setup</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .setup {
+            max-width: 460px;
+            width: 100%;
+            padding: 2rem;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        p {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 0.5rem;
+        }
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: #4a9eff; }
+        input::placeholder { color: #555; }
+        button {
+            margin-top: 1rem;
+            width: 100%;
+            padding: 0.75rem;
+            background: #4a9eff;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #3a8eef; }
+        button:disabled { background: #333; color: #666; cursor: not-allowed; }
+        .error {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #2a1515;
+            border: 1px solid #4a2020;
+            border-radius: 8px;
+            color: #ff6b6b;
+            font-size: 0.85rem;
+            display: none;
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff3;
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="setup">
+        <h1>soundspan</h1>
+        <p>Enter the URL of your soundspan instance to get started.</p>
+        <label for="url">Instance URL</label>
+        <input type="url" id="url" placeholder="https://listen.example.com" autofocus>
+        <button id="connect" onclick="connect()">Connect</button>
+        <div class="error" id="error"></div>
+    </div>
+    <script>
+        async function connect() {
+            const url = document.getElementById("url").value.trim();
+            const btn = document.getElementById("connect");
+            const err = document.getElementById("error");
+
+            if (!url) return;
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Connecting...';
+            err.style.display = "none";
+
+            try {
+                const { invoke } = window.__TAURI__.core;
+                const result = await invoke("set_instance_url", { url });
+                if (!result.ok) {
+                    throw new Error(result.error || "Connection failed");
+                }
+            } catch (e) {
+                err.textContent = e.message || "Could not connect to instance";
+                err.style.display = "block";
+                btn.disabled = false;
+                btn.textContent = "Connect";
+            }
+        }
+
+        document.getElementById("url").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") connect();
+        });
+    </script>
+</body>
+</html>
