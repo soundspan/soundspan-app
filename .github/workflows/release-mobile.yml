@@ -86,11 +86,12 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
 
-      - name: Build unsigned iOS bundle
+      - name: Skip unsigned iOS build
         if: ${{ env.HAS_APPLE_IOS_SIGNING != 'true' }}
-        run: cargo tauri ios build --no-sign
+        run: echo "Skipping iOS IPA build because Apple signing secrets are not configured."
 
       - name: Upload IPA to release
+        if: ${{ env.HAS_APPLE_IOS_SIGNING == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           files: |
