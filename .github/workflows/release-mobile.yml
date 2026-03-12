@@ -76,13 +76,17 @@ jobs:
       - name: Initialize iOS project
         run: cargo tauri ios init
 
-      - name: Build IPA
+      - name: Build signed IPA
+        if: secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_PROVISIONING_PROFILE != ''
         run: cargo tauri ios build
         env:
-          # iOS signing (optional — will build unsigned if not configured)
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+
+      - name: Build unsigned iOS bundle
+        if: !(secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_PROVISIONING_PROFILE != '')
+        run: cargo tauri ios build --no-sign
 
       - name: Upload IPA to release
         uses: softprops/action-gh-release@v2
