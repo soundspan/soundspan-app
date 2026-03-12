@@ -33,6 +33,9 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
+      - name: Create frontend dist stub
+        run: mkdir -p dist
+
       - name: Cargo check
         working-directory: src-tauri
         run: cargo check
