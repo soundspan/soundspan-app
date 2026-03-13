@@ -1,19 +1,26 @@
-# Save this as .acm/acm-tests.yaml (preferred) or acm-tests.yaml in the project root.
-# Language-agnostic starter verification file with repo-local feature-plan validation.
-
 version: acm.tests.v1
 
 defaults:
   cwd: .
-  timeout_sec: 300
+  timeout_sec: 600
 
 tests:
-  - id: smoke
-    summary: Confirm ACM can load repo-local setup and report current status
+  - id: context-smoke
+    summary: Ensure ACM can return scoped context for soundspan-app
     command:
-      argv: ["acm", "status", "--project-root", "."]
+      argv: ["acm", "context", "--project", "soundspan-app", "--task-text", "soundspan-app ACM smoke test", "--phase", "plan"]
     select:
       always_run: true
+    expected:
+      exit_code: 0
+
+  - id: acm-health
+    summary: Ensure repo-local ACM governance assets remain healthy
+    command:
+      argv: ["acm", "health", "--project", "soundspan-app", "--include-details"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", "README.md", "docs/**", "scripts/**"]
     expected:
       exit_code: 0
 
@@ -43,7 +50,7 @@ tests:
       argv: ["python3", "scripts/acm-feature-plan-validate.py", "--help"]
     select:
       phases: ["execute", "review"]
-      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", "README.md", "docs/**", "scripts/**"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", "README.md", "docs/**", "scripts/**"]
     expected:
       exit_code: 0
 
@@ -53,6 +60,119 @@ tests:
       argv: ["python3", "scripts/acm-feature-plan-validate.py"]
     select:
       phases: ["execute", "review"]
-      changed_paths_any: ["**"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", "README.md", "app-shell/**", "aur/**", "docs/**", "scripts/**", "src-tauri/**"]
+    expected:
+      exit_code: 0
+
+  - id: acm-cross-review-help
+    summary: Ensure the repo-local cross-review gate script exposes help
+    command:
+      argv: ["bash", "scripts/acm-cross-review.sh", "--help"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", "docs/**", "scripts/**"]
+    expected:
+      exit_code: 0
+
+  - id: acm-doc-drift-help
+    summary: Ensure the repo-local docs drift guard exposes help
+    command:
+      argv: ["python3", "scripts/acm-doc-drift-guard.py", "--help"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", "docs/**", "scripts/**"]
+    expected:
+      exit_code: 0
+
+  - id: rust-tdd-guard-help
+    summary: Ensure the repo-local Rust TDD guard exposes help
+    command:
+      argv: ["python3", "scripts/acm-tdd-guard.py", "--help"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", "docs/**", "scripts/**"]
+    expected:
+      exit_code: 0
+
+  - id: rust-tdd-guard
+    summary: Enforce TDD metadata and test coverage expectations for native Rust behavior changes
+    command:
+      argv: ["python3", "scripts/acm-tdd-guard.py"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any: ["AGENTS.md", ".acm/**", "scripts/**", "src-tauri/**"]
+    expected:
+      exit_code: 0
+
+  - id: maintainer-map-drift
+    summary: Check maintainer-map coverage after routing or packaging surface changes
+    command:
+      argv: ["python3", "scripts/acm-doc-drift-guard.py", "--mode", "maintainer-map"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any:
+        [
+          "app-shell/**",
+          "aur/**",
+          "src-tauri/tauri.conf.json",
+          "src-tauri/capabilities/**",
+          "src-tauri/src/audio/**",
+          "src-tauri/src/config/security.rs",
+          "src-tauri/src/config/store.rs",
+          "src-tauri/src/lib.rs",
+          "src-tauri/src/main.rs",
+          "docs/maintainer-map.md",
+          "scripts/acm-doc-drift-guard.py"
+        ]
+    expected:
+      exit_code: 0
+
+  - id: readme-drift
+    summary: Check README coverage after onboarding, packaging, or permission surface changes
+    command:
+      argv: ["python3", "scripts/acm-doc-drift-guard.py", "--mode", "readme"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any:
+        [
+          "app-shell/**",
+          "aur/**",
+          "src-tauri/src/audio/**",
+          "src-tauri/src/config/security.rs",
+          "src-tauri/tauri.conf.json",
+          "src-tauri/capabilities/**",
+          "README.md",
+          "scripts/acm-doc-drift-guard.py"
+        ]
+    expected:
+      exit_code: 0
+
+  - id: rust-cargo-check
+    summary: Ensure the native Tauri crate still compiles
+    command:
+      argv: ["cargo", "check", "--manifest-path", "src-tauri/Cargo.toml"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any: ["src-tauri/**"]
+    expected:
+      exit_code: 0
+
+  - id: rust-cargo-test
+    summary: Run Rust unit tests for the native Tauri crate
+    command:
+      argv: ["cargo", "test", "--manifest-path", "src-tauri/Cargo.toml"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any: ["src-tauri/**"]
+    expected:
+      exit_code: 0
+
+  - id: aur-bash-syntax
+    summary: Ensure AUR package scripts remain valid shell syntax
+    command:
+      argv: ["bash", "-n", "aur/PKGBUILD", "aur/soundspan-bin.install"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any: ["aur/**"]
     expected:
       exit_code: 0

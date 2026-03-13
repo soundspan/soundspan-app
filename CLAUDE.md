@@ -6,6 +6,7 @@ Claude companion for a repo whose primary contract is `AGENTS.md`.
 
 - Follow `AGENTS.md` first.
 - Use this file only to map Claude's workflow to the repo contract.
+- Use `docs/maintainer-map.md` when you need repo-specific routing or invariants.
 - If this file conflicts with `AGENTS.md`, `AGENTS.md` wins.
 
 ## Claude Workflow
@@ -29,13 +30,20 @@ If you need runtime or setup diagnostics, use direct CLI `acm status`.
 - Keep prompts specific enough that `context` returns the right rules, active work, memories, and any explicitly known scope.
 - If the receipt looks stale or too narrow, re-run `/acm-context` with a better task description instead of guessing.
 - If governed file work expands beyond the initial receipt scope, record the new files through `/acm-work` before expecting `/acm-review` or `/acm-done` to pass.
-- Do not claim success when `/acm-verify` failed or was skipped for code changes.
+- Do not claim success when `/acm-verify` failed or was skipped for code changes. Verification claims should come from actual command output, and they become stale after later edits.
+- In this repo, `app-shell/index.html` stays the local setup shell, `src-tauri/src/audio/**` owns native playback, and `src-tauri/src/config/security.rs` is the origin-check boundary for local versus remote IPC.
+- For behavior-changing Rust work under `src-tauri/src/**`, write or update a failing Rust test first, use `/acm-work` to record a completed `tdd:red` task before implementation, and keep a Rust test-bearing file change in the same task unless a completed `tdd:exemption` task records why practical Rust coverage is not appropriate.
+- For native-code or Tauri config work, prefer `cargo test --manifest-path src-tauri/Cargo.toml` and `cargo check --manifest-path src-tauri/Cargo.toml` before considering a full Tauri build.
 - `/acm-review` stays thin. Use `{"run":true}` for runnable workflow gates because manual complete notes do not satisfy runnable gates, and reserve manual `status`, `outcome`, `blocked_reason`, and `evidence` fields for non-run mode.
+- This repo now uses a runnable `review:cross-llm` gate for workflow-selected implementation and governance work. Use `/acm-review <receipt_id-or-plan_key> {"run":true}` when the workflow selects it.
 - If `/acm-review {"run":true}` reports repo changes but zero scoped review files, the receipt or declared discovered scope is too narrow. Re-run `/acm-context` or update `/acm-work` before retrying review.
 - For feature work under this repo contract, populate the required `kind=feature` or `kind=feature_stream` plan shape, `stages`, `stage:*` tasks, `parent_task_key`, and leaf `acceptance_criteria` before implementation. See `docs/feature-plans.md`.
 - Let `verify` enforce the feature-plan schema through `scripts/acm-feature-plan-validate.py`.
 - When blocked on a missing product or architectural decision, surface the decision instead of improvising it.
+- If three consecutive fix attempts fail, stop and surface the attempted fixes and the remaining root-cause uncertainty before continuing.
+- Use direct CLI `acm history --entity work|memory|all ...` for archived plan and memory discovery, and `acm status --task-text "<task>" --phase <plan|execute|review>` for runtime/setup diagnostics.
+- Changes to routing surfaces documented in `docs/maintainer-map.md`, or user-facing onboarding/packaging/permission surfaces described in `README.md`, should keep those docs aligned in the same task.
 
 ## Ruleset Maintenance
 
-When `.acm/acm-rules.yaml`, `.acm/acm-tags.yaml`, `.acm/acm-tests.yaml`, or `.acm/acm-workflows.yaml` changes, refresh broker state with `acm sync` or `acm health --apply`, then run `acm health`.
+When `.acm/acm-rules.yaml`, `.acm/acm-tags.yaml`, `.acm/acm-tests.yaml`, `.acm/acm-workflows.yaml`, `AGENTS.md`, `CLAUDE.md`, or repo-local ACM companion docs change, refresh broker state with `acm sync` or `acm health --apply`, then run `acm health`. Treat fresh worktrees the same way before relying on retrieval.

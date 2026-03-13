@@ -1,3 +1,46 @@
 version: acm.workflows.v1
 completion:
-  required_tasks: []
+  required_tasks:
+    - key: verify:tests
+      select:
+        changed_paths_any:
+          - ".acm/**"
+          - ".claude/**"
+          - ".codex/**"
+          - ".github/**"
+          - "AGENTS.md"
+          - "CLAUDE.md"
+          - "README.md"
+          - "app-shell/**"
+          - "aur/**"
+          - "docs/**"
+          - "scripts/**"
+          - "src-tauri/**"
+    - key: review:cross-llm
+      summary: Cross-LLM review
+      rerun_requires_new_fingerprint: true
+      select:
+        phases:
+          - review
+        changed_paths_any:
+          - ".acm/**"
+          - ".claude/**"
+          - ".codex/**"
+          - ".github/**"
+          - "AGENTS.md"
+          - "CLAUDE.md"
+          - "README.md"
+          - "app-shell/**"
+          - "aur/**"
+          - "docs/**"
+          - "scripts/**"
+          - "src-tauri/**"
+      run:
+        argv:
+          - "scripts/acm-cross-review.sh"
+          - "--model"
+          - "gpt-5.3-codex"
+          - "--reasoning-effort"
+          - "xhigh"
+        cwd: .
+        timeout_sec: 1800

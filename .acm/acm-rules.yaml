@@ -16,6 +16,12 @@ rules:
     enforcement: soft
     tags: [context, efficiency]
 
+  - id: rule_read_before_edit
+    summary: Read relevant source before editing it.
+    content: Read the full relevant source before changing it. Do not guess at Tauri wiring, IPC boundaries, Rust module ownership, or packaging metadata.
+    enforcement: hard
+    tags: [workflow, safety]
+
   - id: rule_track_multistep_work
     summary: Track multi-step or multi-file work with work.
     content: Create or update a work plan when the task spans multiple steps, touches multiple files, or may need to survive context compaction. Use verify:tests as the executable verification task when code changes, and add any extra task keys required by .acm/acm-workflows.yaml.
@@ -46,6 +52,60 @@ rules:
     enforcement: hard
     tags: [verification, quality]
 
+  - id: rule_verification_evidence
+    summary: Base verification claims on actual command output.
+    content: Read the full verification output before reporting it, prefix evidence claims with `verify:`, and rerun verification after any subsequent code change. Do not substitute speculative language for executable evidence.
+    enforcement: hard
+    tags: [verification, workflow, safety]
+
+  - id: rule_tdd_native_rust
+    summary: Practice TDD for native Rust behavior changes.
+    content: For behavior-changing Rust work under `src-tauri/src/**`, write or update a failing Rust test first, complete a `tdd:red` task before implementation, and keep a Rust test-bearing file change in the same task. When practical Rust coverage is not appropriate, complete a `tdd:exemption` task with a concrete justification instead. Docs, onboarding, packaging, and workflow-governance-only work are exempt.
+    enforcement: hard
+    tags: [testing, rust, workflow]
+
+  - id: rule_targeted_verification
+    summary: Prefer targeted verification to full packaging builds.
+    content: For native code or Tauri config changes, default to targeted checks such as `cargo test --manifest-path src-tauri/Cargo.toml` and `cargo check --manifest-path src-tauri/Cargo.toml`. Reserve full `cargo tauri build` for packaging/release work or explicit requests.
+    enforcement: soft
+    tags: [verification, efficiency, rust, tauri]
+
+  - id: rule_cross_llm_review
+    summary: Run the repo-standard cross-LLM review when the workflow selects it.
+    content: For non-trivial implementation work and governance changes selected by `.acm/acm-workflows.yaml`, satisfy the repo review gate with `acm review --run --receipt-id <receipt-id>` and keep reviewer model settings in the workflow `run.argv`.
+    enforcement: soft
+    tags: [review, workflow, codex]
+
+  - id: rule_soundspan_app_boundaries
+    summary: Preserve the repo's shell-versus-native-runtime boundaries.
+    content: Keep `app-shell/index.html` focused on local setup and instance selection, keep the remote product UI in the configured soundspan instance, keep native playback logic in `src-tauri/src/audio/**`, and keep Tauri bootstrap/command registration aligned in `src-tauri/src/lib.rs` and `src-tauri/src/main.rs`.
+    enforcement: hard
+    tags: [app-shell, tauri, rust, audio]
+
+  - id: rule_origin_security_boundary
+    summary: Preserve the local-versus-remote IPC security boundary.
+    content: Commands intended only for local setup must stay gated to local app content, and remote playback IPC must stay limited to the configured soundspan instance origin through `src-tauri/src/config/security.rs`.
+    enforcement: hard
+    tags: [security, tauri, ipc]
+
+  - id: rule_store_and_packaging_sync
+    summary: Keep persisted settings and packaging metadata explicit and aligned.
+    content: Persisted store keys should remain documented in `src-tauri/src/config/store.rs`, and packaging/capability changes should keep `src-tauri/tauri.conf.json`, `src-tauri/capabilities/**`, and `aur/**` aligned when identifiers, permissions, bundle targets, or release metadata change.
+    enforcement: hard
+    tags: [config, packaging, tauri]
+
+  - id: rule_docs_and_companion_sync
+    summary: Keep repo guidance and ACM companion assets aligned with behavior.
+    content: Changes to ACM workflow guidance, onboarding, packaging behavior, or native-audio/operator context should keep `AGENTS.md`, `CLAUDE.md`, `.claude/acm-broker/**`, `.codex/acm-broker/**`, `README.md`, and the impacted docs in `docs/**` semantically aligned.
+    enforcement: hard
+    tags: [docs, workflow, onboarding]
+
+  - id: rule_readme_and_maintainer_map_sync
+    summary: Keep README and maintainer routing docs aligned with the surfaces they describe.
+    content: Changes to setup-shell bootstrap, Tauri startup routing, config/security boundaries, packaging metadata, capabilities, or AUR packaging should keep `docs/maintainer-map.md` aligned. User-facing onboarding, packaging, and permission changes should keep `README.md` aligned in the same task.
+    enforcement: hard
+    tags: [docs, onboarding, workflow]
+
   - id: rule_done
     summary: Finish every task with done.
     content: Report every changed file for file-backed work when you know them and give a concise outcome summary. ACM can derive the task delta from the receipt baseline; when that detected delta is empty, the closeout is effectively no-file.
@@ -57,6 +117,18 @@ rules:
     content: Record stable architectural decisions, recurring setup pitfalls, or operator preferences when future tasks would benefit from retrieving them automatically.
     enforcement: soft
     tags: [memory, learning]
+
+  - id: rule_history_lookup
+    summary: Use history and status for discovery instead of guessing.
+    content: Use `acm history --entity work|memory|all` plus the returned `fetch_keys` for archived plan and memory lookup, and use `acm status` for runtime or setup diagnostics when context looks stale or unexpectedly narrow.
+    enforcement: soft
+    tags: [workflow, onboarding]
+
+  - id: rule_three_failure_escalation
+    summary: Stop and reassess after three failed fix attempts.
+    content: If three consecutive attempts to fix the same issue fail, stop, document what was tried and why it failed, reassess the root-cause hypothesis, and ask for direction when the cause is still unclear.
+    enforcement: hard
+    tags: [workflow, safety]
 
   - id: rule_escalate_missing_decisions
     summary: Escalate when a task depends on a missing product or architectural decision.

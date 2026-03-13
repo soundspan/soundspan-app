@@ -16,7 +16,32 @@ The app is a thin native shell that loads your self-hosted soundspan instance in
 | Windows  | WebView2 (Chromium)| Rust → symphonia → cpal → WASAPI | Yes           |
 | Android  | Android WebView   | Rust → symphonia → cpal → AAudio | Yes            |
 
-## Prerequisites
+## Install
+
+Download the latest release for your platform from the [Releases page](https://github.com/soundspan/soundspan-app/releases/latest).
+
+| Platform | Format | Notes |
+|----------|--------|-------|
+| Linux    | `.AppImage`, `.deb`, `.rpm` | AppImage is portable — just `chmod +x` and run |
+| macOS    | `.dmg` | Universal binary (Intel + Apple Silicon) |
+| Windows  | `.exe` (NSIS installer) | WebView2 is included on Windows 10/11 |
+| Android  | `.apk` | Sideload or install from release assets |
+
+### Arch Linux
+
+A `soundspan-bin` package is available on the [AUR](https://aur.archlinux.org/packages/soundspan-bin):
+
+```bash
+yay -S soundspan-bin
+```
+
+### First launch
+
+On first launch you'll be prompted to enter your soundspan instance URL (e.g., `https://listen.example.com`). The app connects to your self-hosted instance and loads it in a native webview.
+
+## Building from source
+
+### Prerequisites
 
 - [Rust](https://rustup.rs/) (1.75+)
 - Platform-specific dependencies:
@@ -24,16 +49,14 @@ The app is a thin native shell that loads your self-hosted soundspan instance in
   - **macOS**: Xcode Command Line Tools
   - **Windows**: WebView2 (pre-installed on Windows 10/11), Visual Studio Build Tools
 
-## Development
+### Development
 
 ```bash
 cargo install tauri-cli --version "^2"
 cargo tauri dev
 ```
 
-On first launch, enter your soundspan instance URL (e.g., `https://listen.example.com`).
-
-## Building
+### Building
 
 ```bash
 cargo tauri build
