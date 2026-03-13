@@ -1,4 +1,4 @@
-# soundspan-app 1.0.0 Release Notes
+# [1.0.0] Release Notes
 
 ## Release Summary
 
@@ -22,10 +22,6 @@ Initial release of the soundspan native desktop and mobile app. A Tauri 2 shell 
 - **Windows**: Download `.exe` (NSIS installer)
 - **Android**: Download `.apk`
 - **Arch Linux**: `yay -S soundspan-bin`
-
-## Known Issues
-
-None at this time.
 
 ## Full Changelog
 

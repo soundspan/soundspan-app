@@ -5,7 +5,29 @@ All notable changes to soundspan-app are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Removed
+
+## [1.0.1]
+
+### Changed
+
+- Extended the local setup-command gate to also allow the configured Tauri `devUrl` origin during development while keeping remote-instance IPC restricted to the configured soundspan origin.
+- Corrected release metadata and package versioning so Cargo, Tauri bundle config, AUR packaging, and shipped release references align on `1.0.1`.
+
+### Fixed
+
+- Fixed the Windows setup-shell connection flow by treating Tauri-hosted WebView2 content as local app content during initial instance bootstrap.
+- Improved setup-shell error reporting so failed instance bootstrap attempts surface the underlying connection or permission error instead of only a generic connect failure.
+
 ## [1.0.0]
+
+### Added
 
 - Tauri 2 native shell that loads a self-hosted soundspan instance in a platform webview.
 - Rust audio backend for hi-res playback on Windows (WASAPI) and Android (AAudio), bypassing Chromium's 48 kHz audio mixer cap.

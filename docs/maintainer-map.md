@@ -21,7 +21,7 @@ Use this file when a task is specific to `soundspan-app` and you need to know wh
 | Decoder, preload, output, or exclusive-mode behavior | `src-tauri/src/audio/**` | tests under the same module tree, any affected IPC commands |
 | Local-only versus remote-instance IPC authorization | `src-tauri/src/config/security.rs` | command handlers in `src-tauri/src/lib.rs` and `src-tauri/src/audio/commands.rs` |
 | Persisted settings or new config keys | `src-tauri/src/config/store.rs` | `src-tauri/src/lib.rs`, any code that reads or writes `config.json` |
-| Bundle targets, capabilities, or app identity | `src-tauri/tauri.conf.json` | `src-tauri/capabilities/**`, `aur/**`, `README.md` |
+| Bundle targets, capabilities, or app identity | `src-tauri/tauri.conf.json` | `src-tauri/capabilities/**`, `aur/**`, `README.md`, release-version docs |
 | Linux release packaging | `aur/PKGBUILD`, `aur/soundspan-bin.install` | release assumptions in `README.md` |
 | Feature-plan process or ACM governance | `AGENTS.md`, `CLAUDE.md`, `.acm/**` | `.claude/acm-broker/**`, `.codex/acm-broker/**`, `docs/feature-plans.md`, `scripts/acm-cross-review.sh`, `scripts/acm-tdd-guard.py` |
 
@@ -34,6 +34,7 @@ Use this file when a task is specific to `soundspan-app` and you need to know wh
 - Remote playback IPC should stay limited to the configured `soundspan` instance origin.
 - Store keys should remain documented in `src-tauri/src/config/store.rs`.
 - Packaging and capability changes should keep Tauri metadata and AUR metadata aligned.
+- Release version bumps should keep `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `aur/PKGBUILD`, `CHANGELOG.md`, and `docs/release-notes/` aligned.
 - Behavior-changing Rust work under `src-tauri/src/**` should start with a failing Rust test, record either `tdd:red` or `tdd:exemption` through ACM work before implementation, and keep a Rust test-bearing file change in the same task unless the exemption explains why that is not practical.
 - Workflow-selected implementation and governance changes should satisfy `acm review --run` before final completion.
 - Changes to routing surfaces listed above should keep `docs/maintainer-map.md` aligned in the same task.

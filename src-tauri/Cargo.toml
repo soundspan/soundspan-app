@@ -1,6 +1,6 @@
 [package]
 name = "soundspan-app"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "soundspan native desktop/mobile app with hi-res audio playback"
 license = "GPL-3.0"
