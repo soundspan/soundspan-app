@@ -7,7 +7,7 @@ Use this file when a task is specific to `soundspan-app` and you need to know wh
 - `app-shell/index.html` is the local setup shell shown before an instance URL is configured.
 - `src-tauri/src/lib.rs` and `src-tauri/src/main.rs` bootstrap Tauri, register commands, load persisted settings, and navigate to the configured remote instance.
 - `src-tauri/src/audio/**` owns the native playback path used to bypass Chromium's 48 kHz mixer limits on platforms that need it.
-- `src-tauri/src/config/security.rs` is the local-versus-remote IPC gate.
+- `src-tauri/src/config/security.rs` is the local-versus-remote IPC gate, including the Windows/WebView2 `http(s)://tauri.localhost` local-shell exception.
 - `src-tauri/src/config/store.rs` is the canonical map of persisted `config.json` keys.
 - `src-tauri/tauri.conf.json`, `src-tauri/capabilities/**`, and `aur/**` hold packaging, capability, and release metadata.
 
@@ -29,6 +29,7 @@ Use this file when a task is specific to `soundspan-app` and you need to know wh
 
 - The product UI lives in the configured remote `soundspan` instance. The local shell is bootstrap-only unless a task explicitly changes that model.
 - Local-only commands should stay restricted to local app content.
+- WebView2-hosted setup content on Windows counts as local app content even though it is exposed on `http(s)://tauri.localhost`.
 - Remote playback IPC should stay limited to the configured `soundspan` instance origin.
 - Store keys should remain documented in `src-tauri/src/config/store.rs`.
 - Packaging and capability changes should keep Tauri metadata and AUR metadata aligned.
@@ -46,6 +47,7 @@ Use this file when a task is specific to `soundspan-app` and you need to know wh
 - Maintainer-map drift guard: `python3 scripts/acm-doc-drift-guard.py --mode maintainer-map`
 - README drift guard: `python3 scripts/acm-doc-drift-guard.py --mode readme`
 - AUR packaging edits: `bash -n aur/PKGBUILD aur/soundspan-bin.install`
+- Setup-shell regressions: confirm `app-shell/index.html` shows raw invoke failures instead of collapsing to a generic connect error
 
 ## Design References
 

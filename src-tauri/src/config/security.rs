@@ -32,7 +32,12 @@ pub fn ensure_instance_caller(app: &AppHandle, window: &WebviewWindow) -> Result
 }
 
 fn is_remote(url: &Url) -> bool {
-    matches!(url.scheme(), "http" | "https")
+    matches!(url.scheme(), "http" | "https") && !is_local_app_url(url)
+}
+
+fn is_local_app_url(url: &Url) -> bool {
+    matches!(url.scheme(), "tauri")
+        || matches!(url.host_str(), Some("tauri.localhost"))
 }
 
 fn same_origin(left: &Url, right: &Url) -> bool {
@@ -66,5 +71,9 @@ mod tests {
             &Url::parse("https://listen.example.com").unwrap()
         ));
         assert!(!is_remote(&Url::parse("tauri://localhost").unwrap()));
+        assert!(!is_remote(&Url::parse("http://tauri.localhost").unwrap()));
+        assert!(!is_remote(
+            &Url::parse("https://tauri.localhost/index.html").unwrap()
+        ));
     }
 }

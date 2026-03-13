@@ -127,6 +127,24 @@
         <div class="error" id="error"></div>
     </div>
     <script>
+        function describeError(error) {
+            if (typeof error === "string" && error.trim()) return error;
+            if (error && typeof error.message === "string" && error.message.trim()) {
+                return error.message;
+            }
+            if (error && typeof error.error === "string" && error.error.trim()) {
+                return error.error;
+            }
+            try {
+                const serialized = JSON.stringify(error);
+                if (serialized && serialized !== "{}") return serialized;
+            } catch (_) {
+                // Ignore serialization failures and fall back to String().
+            }
+            const fallback = String(error || "").trim();
+            return fallback || "Could not connect to instance";
+        }
+
         async function connect() {
             const url = document.getElementById("url").value.trim();
             const btn = document.getElementById("connect");
@@ -149,7 +167,7 @@
                     throw new Error(result.error || "Connection failed");
                 }
             } catch (e) {
-                err.textContent = e.message || "Could not connect to instance";
+                err.textContent = describeError(e);
                 err.style.display = "block";
                 btn.disabled = false;
                 btn.textContent = "Connect";
