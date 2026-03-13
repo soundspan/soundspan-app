@@ -39,7 +39,7 @@ yay -S soundspan-bin
 
 On first launch you'll be prompted to enter your soundspan instance URL (e.g., `https://listen.example.com`). The app connects to your self-hosted instance and loads it in a native webview.
 
-On Windows, that setup page is still local app content even though WebView2 serves it from a `http(s)://tauri.localhost/...` origin. The app only permits instance bootstrap commands from that local shell and now surfaces the underlying connection or permission error instead of a generic failure message when the initial health check fails.
+On Windows, that setup page is still local app content even though WebView2 serves it from a `http(s)://tauri.localhost/...` origin. In development, the same local-only bootstrap commands are also allowed from the configured Tauri `devUrl` origin. The app surfaces the underlying connection or permission error instead of a generic failure message when the initial health check fails.
 
 ## Building from source
 

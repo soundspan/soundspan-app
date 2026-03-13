@@ -19,7 +19,7 @@ async fn set_instance_url(
     window: tauri::WebviewWindow,
     url: String,
 ) -> Result<UrlResult, String> {
-    ensure_local_caller(&window)?;
+    ensure_local_caller(&app, &window)?;
     let trimmed = url.trim().trim_end_matches('/').to_string();
 
     let parsed = match url::Url::parse(&trimmed) {
@@ -87,7 +87,7 @@ async fn get_instance_url(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
 ) -> Result<Option<String>, String> {
-    ensure_local_caller(&window)?;
+    ensure_local_caller(&app, &window)?;
     let store = app.store("config.json").map_err(|e| e.to_string())?;
     let url = store
         .get("instance_url")
