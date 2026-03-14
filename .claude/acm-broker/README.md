@@ -54,7 +54,7 @@ For repo-local verification scaffolding, pair `init` with `--apply-template veri
 - The optional `claude-hooks` template re-injects the ACM loop at session start or compaction, keeps edits blocked until `/acm-context` succeeds, nudges `/acm-work` once edits span files or governed scope expands, and blocks stop until edited work is closed with `/acm-done`.
 - Scope mode defaults to advisory `warn` when `scope_mode` is omitted.
 - `/acm-done` can rely on the receipt baseline delta when explicit files are inconvenient. If that detected delta is empty, the closeout is effectively no-file.
-- Runnable review gates can carry repo-local script arguments in `.acm/acm-workflows.yaml` `run.argv`, which is where model and reasoning choices should live.
+- Runnable review gates can carry repo-local script arguments in `.acm/acm-workflows.yaml` `run.argv`, which is where model, reasoning, and sandbox choices should live.
 - Use `verify` for deterministic repo checks and `review` for one named workflow signoff gate; they are complementary, not interchangeable.
 - The practical sequencing rule is `work` -> `verify` -> `review --run` when a gate exists -> `done`.
 - Some repos enforce richer feature-plan schemas through verify-time scripts that inspect `ACM_PLAN_KEY` / `ACM_RECEIPT_ID`; keep that structure in `work`, not in free-form prose.

@@ -41,6 +41,9 @@ completion:
           - "--model"
           - "gpt-5.3-codex"
           - "--reasoning-effort"
-          - "xhigh"
+          - "high"
+          # Set this per host/runtime. Keep read-only where Landlock works; relax it on nested/containerized hosts that already provide isolation.
+          - "--sandbox"
+          - "workspace-write"          
         cwd: .
         timeout_sec: 1800

@@ -6,7 +6,7 @@ usage() {
 Run the repo-local cross-LLM review gate for soundspan-app.
 
 Usage:
-  scripts/acm-cross-review.sh [--model <codex-model>] [--reasoning-effort <level>]
+  scripts/acm-cross-review.sh [--model <codex-model>] [--reasoning-effort <level>] [--sandbox <mode>]
 
 Environment:
   ACM_PROJECT_ID
@@ -61,6 +61,11 @@ while [[ $# -gt 0 ]]; do
     --reasoning|--reasoning-effort)
       require_flag_value "$1" "${2:-}"
       codex_reasoning_effort="$2"
+      shift 2
+      ;;
+    --sandbox)
+      require_flag_value "$1" "${2:-}"
+      codex_sandbox="$2"
       shift 2
       ;;
     *)

@@ -55,6 +55,7 @@ Use the same maintenance loop as any other primary ACM operator when rules, tags
 - `context` is task framing, not a substitute for Codex reading the repo itself.
 - If governed work discovers later-relevant files, declare them with `work.plan.discovered_paths` before expecting `review` or `done` to pass.
 - `done` can omit `files_changed` and rely on the receipt baseline delta when that is more convenient.
+- Runnable review gates can carry repo-local script arguments in `.acm/acm-workflows.yaml` `run.argv`, which is where model, reasoning, and sandbox choices should live.
 - Use `verify` for repo checks and `review` for named workflow gates; `review` is not a second generic test runner.
 
 ## AGENTS companion
