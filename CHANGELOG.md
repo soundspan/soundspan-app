@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- ACM cross-review now exposes `--sandbox` in `scripts/acm-cross-review.sh`, and the active sandbox mode is pinned from `.acm/acm-workflows.yaml` so operators can tune it per host runtime.
+- ACM cross-review now uses a provider-aware `scripts/acm-cross-review.sh` with a shared `--yolo` shortcut: Codex maps it to native `--yolo`, while Claude maps it to `--dangerously-skip-permissions`.
 
 ### Removed
 

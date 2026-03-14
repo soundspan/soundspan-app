@@ -20,7 +20,7 @@ tests:
       argv: ["acm", "health", "--project", "soundspan-app", "--include-details"]
     select:
       phases: ["execute", "review"]
-      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", "README.md", "docs/**", "scripts/**"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", ".opencode/**", "README.md", "docs/**", "scripts/**"]
     expected:
       exit_code: 0
 
@@ -50,7 +50,7 @@ tests:
       argv: ["python3", "scripts/acm-feature-plan-validate.py", "--help"]
     select:
       phases: ["execute", "review"]
-      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", "README.md", "docs/**", "scripts/**"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", ".opencode/**", "README.md", "docs/**", "scripts/**"]
     expected:
       exit_code: 0
 
@@ -60,7 +60,7 @@ tests:
       argv: ["python3", "scripts/acm-feature-plan-validate.py"]
     select:
       phases: ["execute", "review"]
-      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", "README.md", "app-shell/**", "aur/**", "docs/**", "scripts/**", "src-tauri/**"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", ".opencode/**", "README.md", "app-shell/**", "aur/**", "docs/**", "scripts/**", "src-tauri/**"]
     expected:
       exit_code: 0
 
@@ -70,7 +70,17 @@ tests:
       argv: ["bash", "scripts/acm-cross-review.sh", "--help"]
     select:
       phases: ["execute", "review"]
-      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", "docs/**", "scripts/**"]
+      changed_paths_any: ["AGENTS.md", "CLAUDE.md", ".acm/**", ".claude/**", ".codex/**", ".opencode/**", "docs/**", "scripts/**"]
+    expected:
+      exit_code: 0
+
+  - id: acm-cross-review-provider-flags
+    summary: Ensure the repo-local cross-review gate script covers shared yolo and provider flags
+    command:
+      argv: ["python3", "scripts/test_acm_cross_review.py"]
+    select:
+      phases: ["execute", "review"]
+      changed_paths_any: ["scripts/acm-cross-review.sh", "scripts/test_acm_cross_review.py", ".acm/acm-workflows.yaml", ".acm/acm-tests.yaml"]
     expected:
       exit_code: 0
 

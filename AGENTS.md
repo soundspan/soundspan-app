@@ -49,6 +49,7 @@ If you need to debug project setup, loaded ACM files, integrations, or what `con
 - After three consecutive failed attempts to fix the same issue, stop, document what was tried, reassess the root-cause hypothesis, and ask for direction if the root cause is still unclear.
 - Prefer targeted verification. For native code or Tauri config changes, default to `cargo test --manifest-path src-tauri/Cargo.toml` and `cargo check --manifest-path src-tauri/Cargo.toml`; reserve full `cargo tauri build` for packaging/release work or when the user explicitly asks for it.
 - When `.acm/acm-workflows.yaml` selects `review:cross-llm`, satisfy it with `acm review --run --receipt-id <receipt-id>` instead of treating review as optional prose.
+- Reviewer provider, model, reasoning, and shared `--yolo` settings live in `.acm/acm-workflows.yaml`; `--yolo` maps to native Codex yolo mode or Claude dangerous-permissions mode.
 
 ## Repository-Specific Rules
 
@@ -125,5 +126,5 @@ Use thinner plans for bugfixes, narrow maintenance, review-only work, or workflo
 
 ## Tool-Specific Companions
 
-`CLAUDE.md`, `.claude/acm-broker/**`, `.codex/acm-broker/**`, slash commands, and Codex skills should stay thin and map their workflow back to this file.
+`CLAUDE.md`, `.claude/acm-broker/**`, `.codex/acm-broker/**`, `.opencode/acm-broker/**`, slash commands, and repo-local agent companions should stay thin and map their workflow back to this file.
 If they disagree with this file, this file is authoritative.

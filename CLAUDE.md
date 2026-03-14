@@ -36,6 +36,7 @@ If you need runtime or setup diagnostics, use direct CLI `acm status`.
 - For native-code or Tauri config work, prefer `cargo test --manifest-path src-tauri/Cargo.toml` and `cargo check --manifest-path src-tauri/Cargo.toml` before considering a full Tauri build.
 - `/acm-review` stays thin. Use `{"run":true}` for runnable workflow gates because manual complete notes do not satisfy runnable gates, and reserve manual `status`, `outcome`, `blocked_reason`, and `evidence` fields for non-run mode.
 - This repo now uses a runnable `review:cross-llm` gate for workflow-selected implementation and governance work. Use `/acm-review <receipt_id-or-plan_key> {"run":true}` when the workflow selects it.
+- Reviewer provider and high-trust flag settings stay in `.acm/acm-workflows.yaml`; this repo uses the shared `--yolo` shortcut, which maps to native Codex yolo mode or Claude dangerous-permissions mode.
 - If `/acm-review {"run":true}` reports repo changes but zero scoped review files, the receipt or declared discovered scope is too narrow. Re-run `/acm-context` or update `/acm-work` before retrying review.
 - For feature work under this repo contract, populate the required `kind=feature` or `kind=feature_stream` plan shape, `stages`, `stage:*` tasks, `parent_task_key`, and leaf `acceptance_criteria` before implementation. See `docs/feature-plans.md`.
 - Let `verify` enforce the feature-plan schema through `scripts/acm-feature-plan-validate.py`.

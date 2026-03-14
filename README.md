@@ -70,6 +70,10 @@ Arch Linux packaging is provided via the [`aur/`](./aur) scaffold, which consume
 
 Release version bumps should keep `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `aur/PKGBUILD`, `CHANGELOG.md`, and `docs/release-notes/` aligned in the same task.
 
+## ACM operator notes
+
+For contributors using ACM, `AGENTS.md` remains the repo contract source of truth. Repo-local companion docs are available under `.claude/acm-broker/`, `.codex/acm-broker/`, and `.opencode/acm-broker/`.
+
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).

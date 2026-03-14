@@ -23,7 +23,7 @@ Use this file when a task is specific to `soundspan-app` and you need to know wh
 | Persisted settings or new config keys | `src-tauri/src/config/store.rs` | `src-tauri/src/lib.rs`, any code that reads or writes `config.json` |
 | Bundle targets, capabilities, or app identity | `src-tauri/tauri.conf.json` | `src-tauri/capabilities/**`, `aur/**`, `README.md`, release-version docs |
 | Linux release packaging | `aur/PKGBUILD`, `aur/soundspan-bin.install` | release assumptions in `README.md` |
-| Feature-plan process or ACM governance | `AGENTS.md`, `CLAUDE.md`, `.acm/**` | `.claude/acm-broker/**`, `.codex/acm-broker/**`, `docs/feature-plans.md`, `scripts/acm-cross-review.sh`, `scripts/acm-tdd-guard.py` |
+| Feature-plan process or ACM governance | `AGENTS.md`, `CLAUDE.md`, `.acm/**` | `.claude/acm-broker/**`, `.codex/acm-broker/**`, `.opencode/acm-broker/**`, `docs/feature-plans.md`, `scripts/acm-cross-review.sh`, `scripts/acm-tdd-guard.py` |
 
 ## Repo Invariants
 
