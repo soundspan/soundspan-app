@@ -18,11 +18,11 @@ Environment:
   ACM_WORKFLOW_SOURCE_PATH
   ACM_CROSS_REVIEW_MODEL
   ACM_CROSS_REVIEW_REASONING_EFFORT
+  ACM_CROSS_REVIEW_SANDBOX
   ACM_REVIEW_BASELINE_CAPTURED
   ACM_REVIEW_EFFECTIVE_SCOPE_PATHS_JSON
   ACM_REVIEW_CHANGED_PATHS_JSON
   ACM_REVIEW_TASK_DELTA_SOURCE
-  ACM_CROSS_REVIEW_SANDBOX
 USAGE
 }
 
@@ -42,7 +42,7 @@ require_flag_value() {
 
 default_codex_model="gpt-5.3-codex"
 default_reasoning_effort="xhigh"
-default_codex_sandbox="danger-full-access"
+default_codex_sandbox="read-only"
 codex_model="${ACM_CROSS_REVIEW_MODEL:-${default_codex_model}}"
 codex_reasoning_effort="${ACM_CROSS_REVIEW_REASONING_EFFORT:-${default_reasoning_effort}}"
 codex_sandbox="${ACM_CROSS_REVIEW_SANDBOX:-${default_codex_sandbox}}"
@@ -115,8 +115,6 @@ codex_stderr_path="${tmp_dir}/codex-stderr.txt"
 receipt_fetch_path="${tmp_dir}/receipt-fetch.json"
 plan_fetch_path="${tmp_dir}/plan-fetch.json"
 effective_scope_paths_path="${tmp_dir}/effective-scope-paths.txt"
-provided_scope_paths_path="${tmp_dir}/provided-scope-paths.txt"
-derived_scope_paths_path="${tmp_dir}/derived-scope-paths.txt"
 tracked_scope_path="${tmp_dir}/tracked-scope-paths.txt"
 untracked_scope_path="${tmp_dir}/untracked-scope-paths.txt"
 provided_changed_paths_json="${ACM_REVIEW_CHANGED_PATHS_JSON:-}"
@@ -169,10 +167,8 @@ fi
 
 if git -C "${REPO_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   untracked_changed="$(git -C "${REPO_ROOT}" ls-files --others --exclude-standard 2>/dev/null || true)"
-  : >"${provided_scope_paths_path}"
-  : >"${derived_scope_paths_path}"
   if [[ -n "${provided_effective_scope_json}" ]]; then
-    python3 - "${provided_effective_scope_json}" "${provided_scope_paths_path}" <<'PY'
+    python3 - "${provided_effective_scope_json}" "${effective_scope_paths_path}" <<'PY'
 import json
 import sys
 
@@ -196,21 +192,20 @@ with open(output_path, "w", encoding="utf-8") as handle:
     for path in sorted(dict.fromkeys(paths)):
         handle.write(path + "\n")
 PY
-  fi
-
-  ACM_LOG_SINK=discard acm fetch \
-    --project "${ACM_PROJECT_ID}" \
-    --key "receipt:${receipt_id}" >"${receipt_fetch_path}"
-  : >"${plan_fetch_path}"
-  if [[ -n "${active_plan_key}" ]]; then
-    if ! ACM_LOG_SINK=discard acm fetch \
+  else
+    ACM_LOG_SINK=discard acm fetch \
       --project "${ACM_PROJECT_ID}" \
-      --key "${active_plan_key}" >"${plan_fetch_path}" 2>/dev/null; then
-      : >"${plan_fetch_path}"
+      --key "receipt:${receipt_id}" >"${receipt_fetch_path}"
+    : >"${plan_fetch_path}"
+    if [[ -n "${active_plan_key}" ]]; then
+      if ! ACM_LOG_SINK=discard acm fetch \
+        --project "${ACM_PROJECT_ID}" \
+        --key "${active_plan_key}" >"${plan_fetch_path}" 2>/dev/null; then
+        : >"${plan_fetch_path}"
+      fi
     fi
-  fi
 
-  python3 - "${receipt_fetch_path}" "${plan_fetch_path}" "${derived_scope_paths_path}" <<'PY'
+    python3 - "${receipt_fetch_path}" "${plan_fetch_path}" "${effective_scope_paths_path}" <<'PY'
 import json
 import sys
 
@@ -263,32 +258,7 @@ with open(output_path, "w", encoding="utf-8") as handle:
     for path in sorted(dict.fromkeys(effective_scope)):
         handle.write(path + "\n")
 PY
-
-  python3 - "${provided_scope_paths_path}" "${derived_scope_paths_path}" "${effective_scope_paths_path}" <<'PY'
-import sys
-
-provided_path, derived_path, output_path = sys.argv[1], sys.argv[2], sys.argv[3]
-
-
-def load_lines(path):
-    values = []
-    with open(path, "r", encoding="utf-8") as handle:
-        for line in handle:
-            normalized = line.strip().rstrip("/")
-            if normalized:
-                values.append(normalized)
-    return values
-
-
-merged = []
-for path in load_lines(provided_path) + load_lines(derived_path):
-    if path not in merged:
-        merged.append(path)
-
-with open(output_path, "w", encoding="utf-8") as handle:
-    for path in merged:
-        handle.write(path + "\n")
-PY
+  fi
 
   if [[ -n "${provided_changed_paths_json}" ]]; then
     python3 - "${provided_changed_paths_json}" "${changed_files_path}" <<'PY'
@@ -324,13 +294,11 @@ PY
   fi
   repo_changed_count="$(grep -c '.' "${changed_files_path}" || true)"
 
-  python3 - "${changed_files_path}" "${effective_scope_paths_path}" "${REPO_ROOT}" <<'PY' >"${tmp_dir}/changed-files-scoped.txt"
+  python3 - "${changed_files_path}" "${effective_scope_paths_path}" <<'PY' >"${tmp_dir}/changed-files-scoped.txt"
 import sys
 
-changed_path, scope_path, repo_root = sys.argv[1], sys.argv[2], sys.argv[3]
+changed_path, scope_path = sys.argv[1], sys.argv[2]
 completion_managed_paths = {
-    "AGENTS.md",
-    "CLAUDE.md",
     ".acm/acm-rules.yaml",
     ".acm/acm-tags.yaml",
     ".acm/acm-tests.yaml",
@@ -345,15 +313,7 @@ completion_managed_paths = {
 
 
 def normalize(path):
-    normalized = path.strip().replace("\\", "/").rstrip("/")
-    if normalized.startswith("./"):
-        normalized = normalized[2:]
-
-    normalized_root = repo_root.strip().replace("\\", "/").rstrip("/")
-    if normalized_root and normalized.startswith(normalized_root + "/"):
-        normalized = normalized[len(normalized_root) + 1:]
-
-    return normalized
+    return path.strip().rstrip("/")
 
 
 with open(scope_path, "r", encoding="utf-8") as handle:
@@ -439,7 +399,7 @@ fi
 cat >"${prompt_path}" <<EOF
 Review the current task-scoped uncommitted changes in the repository at ${REPO_ROOT}.
 
-You are the cross-LLM review gate for soundspan-app. This review is read-only and blocks completion if there are real issues.
+You are the cross-LLM review gate for soundspan-app. This review is read-only, must not modify files by any means, and blocks completion if there are real issues.
 
 Changed files:
 $(if [[ -s "${changed_files_path}" ]]; then cat "${changed_files_path}"; else echo "(no changed files detected)"; fi)
@@ -453,10 +413,11 @@ Scope counts:
 
 Instructions:
 - Start by reading AGENTS.md and .acm/acm-workflows.yaml when present.
+- Do not modify, create, delete, rename, stage, or overwrite files, and do not use any command, tool, or redirection that writes to the filesystem; if an action would change files by any means, do not do it.
 - Treat the review scope as the active effective scope: receipt 'initial_scope_paths', any 'plan.discovered_paths', plus ACM-managed governance files already allowed by completion reporting.
 - Review only the changed files listed above. Open a changed file or run local diff commands for those paths only when the diff summary suggests a plausible blocking risk, and do not roam through unrelated files.
 - Keep the investigation tight: after the initial AGENTS/workflow reads, use at most 8 additional read-only commands before deciding pass/fail.
-- Focus on blocking issues only: correctness bugs, regressions, native audio breakage, Tauri IPC/security mistakes, setup-shell regressions, packaging/capability drift, workflow-gate mistakes, missing verification coverage, or docs/companion drift that would mislead maintainers.
+- Focus on blocking issues only: correctness bugs, regressions, broken command semantics, contract/schema drift, CLI/MCP parity gaps, workflow-gate mistakes, missing verification coverage, or docs/examples/skills drift that would mislead users.
 - Ignore nits, style preferences, and speculative concerns.
 - If there are no blocking issues, set status to "pass" and return an empty findings array.
 - If there is any blocking issue, set status to "fail" and list only blocking findings.
@@ -487,6 +448,7 @@ codex_args=(
 mkdir -p "${tmp_dir}/codex-cache"
 
 codex_exit_code=0
+# Preserve the user's Codex home so auth/config remain available, but isolate cache/tmp writes.
 XDG_CACHE_HOME="${tmp_dir}/codex-cache" \
 TMPDIR="${tmp_dir}" \
 codex "${codex_args[@]}" >"${codex_stdout_path}" 2>"${codex_stderr_path}" <"${prompt_path}" || codex_exit_code=$?
@@ -497,7 +459,6 @@ import json
 import sys
 
 stdout_path, stderr_path, output_path = sys.argv[1], sys.argv[2], sys.argv[3]
-
 
 def load_candidates(path):
     with open(path, "r", encoding="utf-8") as handle:
@@ -510,7 +471,6 @@ def load_candidates(path):
         if line.startswith("{") and line.endswith("}"):
             candidates.append(line)
     return candidates
-
 
 for candidate_path in (stdout_path, stderr_path):
     for candidate in load_candidates(candidate_path):
